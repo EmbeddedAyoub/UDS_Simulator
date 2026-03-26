@@ -4,14 +4,13 @@
 # =============================================================================
 
 from PyQt5.QtWidgets import (
-    QDialog, QVBoxLayout, QHBoxLayout, QLabel,
+    QDialog, QVBoxLayout, QLabel,
     QLineEdit, QPushButton, QFrame, QGraphicsDropShadowEffect
 )
 from PyQt5.QtCore import Qt, QPropertyAnimation, QEasingCurve, QPoint
-from PyQt5.QtGui  import QFont, QColor
+from PyQt5.QtGui  import QColor
 
 from common.db_handler    import DatabaseHandler
-from common.uds_constants import ROLE_ADMIN, ROLE_TECHNICIAN, ROLE_READER
 
 
 # =============================================================================

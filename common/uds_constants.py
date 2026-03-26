@@ -146,6 +146,7 @@ SESSION_SERVICE_MATRIX = {
         "allowed_services": [
             SID_DIAGNOSTIC_SESSION_CONTROL,
             SID_SECURITY_ACCESS,
+            SID_ECU_RESET,
         ],
         "description": "Default Session — services de base Sghir"
     },
@@ -180,21 +181,18 @@ SESSION_SERVICE_MATRIX = {
 ROLE_PERMISSIONS = {
     ROLE_ADMIN: {
         "can_read":             True,
-        "can_write":            True,
         "can_reset":            True,
         "can_change_session":   True,
         "can_security_access":  True,
     },
     ROLE_TECHNICIAN: {
         "can_read":             True,
-        "can_write":            True,
         "can_reset":            True,
         "can_change_session":   True,
         "can_security_access":  False,
     },
     ROLE_READER: {
         "can_read":             True,
-        "can_write":            False,
         "can_reset":            False,
         "can_change_session":   False,
         "can_security_access":  False,

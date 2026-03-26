@@ -69,6 +69,7 @@ class ECUSimulator:
         self.current_session = SESSION_DEFAULT   # ECU ybda f Default session
         self._failed_key_attempts = 0
         self._max_key_attempts    = 3
+        self._key_off_allowed = False
         # Callback — GUI tconnectiw bih bach tchargi log entries
         # tstawdih hakda: ecu.on_frame_logged = my_gui_function
         self.on_frame_logged = None
@@ -149,42 +150,77 @@ class ECUSimulator:
     #             SID+0x40            P2 timing bytes (standard values)
     # -------------------------------------------------------------------------
     def _handle_dsc(self, payload: list[int]) -> list[int]:
-        # Length check — lazm yakun 2 bytes: [SID, sub_function]
-        if len(payload) < 2:
-            return self._negative_response(SID_DIAGNOSTIC_SESSION_CONTROL,
-                                           NRC_INCORRECT_MESSAGE_LENGTH)
 
+        # ===============================
+        # 1. Length check FIRST
+        # ===============================
+        if len(payload) < 2:
+            return self._negative_response(
+                SID_DIAGNOSTIC_SESSION_CONTROL,
+                NRC_INCORRECT_MESSAGE_LENGTH
+            )
+
+        # ===============================
+        # 2. Extract sub_function
+        # ===============================
         sub_function = payload[1]
 
-        # Sub-function valid?
+        # ===============================
+        # 3. Sub-function validation
+        # ===============================
         if sub_function not in [SESSION_DEFAULT, SESSION_EXTENDED, SESSION_PROGRAMMING]:
-            return self._negative_response(SID_DIAGNOSTIC_SESSION_CONTROL,
-                                           NRC_SUBFUNCTION_NOT_SUPPORTED)
-            # Security check — ila bghiti session Extended wla Programming
-        if sub_function in [SESSION_EXTENDED]:
+            return self._negative_response(
+                SID_DIAGNOSTIC_SESSION_CONTROL,
+                NRC_SUBFUNCTION_NOT_SUPPORTED
+            )
+        # ===============================
+        # 4. CONDITIONS (Programming only)
+        # ===============================
+        if sub_function == SESSION_PROGRAMMING:
+            TEMP_DID = 0xF405
+            temp = self.db.get_did_value(TEMP_DID)
+
+            if temp is not None and temp >= 20 :
+                return self._negative_response(
+                    SID_DIAGNOSTIC_SESSION_CONTROL,
+                    NRC_CONDITIONS_NOT_CORRECT
+                )
+        # ===============================
+        # 5. Security check
+        # ===============================
+        if sub_function == SESSION_EXTENDED:
             if not getattr(self, '_security_unlocked', False):
-                return self._negative_response(SID_DIAGNOSTIC_SESSION_CONTROL,
-                                            NRC_SECURITY_ACCESS_DENIED)
-        # Role check — reader mashi msmoh ybddel session
-        ok, reason = self.db.can_change_session(self.role)
+                return self._negative_response(
+                    SID_DIAGNOSTIC_SESSION_CONTROL,
+                    NRC_SECURITY_ACCESS_DENIED
+                )
+
+        # ===============================
+        # 6. Role check
+        # ===============================
+        ok, _ = self.db.can_change_session(self.role)
         if not ok:
-            return self._negative_response(SID_DIAGNOSTIC_SESSION_CONTROL,
-                                           NRC_SECURITY_ACCESS_DENIED)
+            return self._negative_response(
+                SID_DIAGNOSTIC_SESSION_CONTROL,
+                NRC_SECURITY_ACCESS_DENIED
+            )
 
-        # Bddel session
+        # ===============================
+        # 7. Apply session
+        # ===============================
         self.current_session = sub_function
-
-        # Update DID_ACTIVE_SESSION f database
         self.db.set_did_value(DID_ACTIVE_SESSION, sub_function)
 
-        # Positive response: [0x50, sub_function, P2_high, P2_low, P2Ex_high, P2Ex_low]
-        # P2 = 25ms (0x00, 0x19), P2Ex = 5000ms (0x01, 0xF4) — standard values
+        # ===============================
+        # 8. Positive response
+        # ===============================
         response_payload = [
             SID_DIAGNOSTIC_SESSION_CONTROL + POSITIVE_RESPONSE_OFFSET,
             sub_function,
-            0x00, 0x19,   # P2 server max = 25ms
-            0x01, 0xF4    # P2* server max = 5000ms
+            0x00, 0x14,
+            0x00, 0xC8
         ]
+
         return build_uds_frame(response_payload)
 
     # -------------------------------------------------------------------------
@@ -201,10 +237,22 @@ class ECUSimulator:
         reset_type = payload[1]
 
         # Reset type valid?
-        if reset_type not in [RESET_HARD, RESET_KEY_OFF, RESET_SOFT]:
+        if reset_type not in [RESET_KEY_OFF, RESET_SOFT]:
             return self._negative_response(SID_ECU_RESET,
                                            NRC_SUBFUNCTION_NOT_SUPPORTED)
-
+        if reset_type == RESET_KEY_OFF:
+            if not self._key_off_allowed:
+                return self._negative_response(
+                    SID_ECU_RESET,
+                    NRC_CONDITIONS_NOT_CORRECT
+                )
+        if reset_type == RESET_SOFT:
+            if self.current_session == SESSION_DEFAULT:
+                if not getattr(self, '_security_unlocked', False):
+                    return self._negative_response(
+                        SID_ECU_RESET,
+                        NRC_SECURITY_ACCESS_DENIED
+                )
         # Role check
         ok, reason = self.db.can_reset_ecu(self.role)
         if not ok:
@@ -233,60 +281,58 @@ class ECUSimulator:
     # -------------------------------------------------------------------------
     def _handle_read_did(self, payload: list[int]) -> list[int]:
 
-        # ===============================
-        # 0. HARD VALIDATION
-        # ===============================
         length = len(payload)  # includes SID byte
 
-        # Less than 3 bytes → IncorrectMessageLength
+        # -------------------------------
+        # 0. Length check
+        # -------------------------------
         if length < 3:
             return self._negative_response(
                 SID_READ_DATA_BY_IDENTIFIER,
                 NRC_INCORRECT_MESSAGE_LENGTH
             )
-        
-        # More than 3 bytes → check if (length - 1) is divisible by 2
-        # (length-1) = number of DID bytes, must be multiple of 2
+
         if length > 3:
-            did_bytes = length - 1  # subtract SID byte
+            did_bytes = length - 1
             if did_bytes % 2 == 0:
-                # Valid format but multiple DIDs → RequestTooLong
                 return self._negative_response(
                     SID_READ_DATA_BY_IDENTIFIER,
                     NRC_REQUEST_TOO_LONG
                 )
             else:
-                # Odd number of DID bytes → IncorrectMessageLength
                 return self._negative_response(
                     SID_READ_DATA_BY_IDENTIFIER,
                     NRC_INCORRECT_MESSAGE_LENGTH
                 )
-        # ===============================
-        # 1. Security check
-        # ===============================
-        if not getattr(self, '_security_unlocked', False):
-            return self._negative_response(
-                SID_READ_DATA_BY_IDENTIFIER,
-                NRC_SECURITY_ACCESS_DENIED
-            )
 
-        # ===============================
-        # 2. Extract DID
-        # ===============================
+        # -------------------------------
+        # 1. Extract DID
+        # -------------------------------
         did = (payload[1] << 8) | payload[2]
 
-        # ===============================
+        # -------------------------------
+        # 2. Security check ONLY for VIN (0xF190)
+        # -------------------------------
+        if did == 0xF18C:
+            if not getattr(self, "_security_unlocked", False):
+                return self._negative_response(
+                    SID_READ_DATA_BY_IDENTIFIER,
+                    NRC_SECURITY_ACCESS_DENIED
+                )
+
+        # -------------------------------
         # 3. DID exists?
-        # ===============================
+        # -------------------------------
         did_info = self.db.get_did_info(did)
         if did_info["value"] is None:
             return self._negative_response(
-                    SID_READ_DATA_BY_IDENTIFIER,
-                    NRC_REQUEST_OUT_OF_RANGE
-                )
-        # ===============================
-        # 4. Access check
-        # ===============================
+                SID_READ_DATA_BY_IDENTIFIER,
+                NRC_REQUEST_OUT_OF_RANGE
+            )
+
+        # -------------------------------
+        # 4. Access check (roles)
+        # -------------------------------
         ok, _ = self.db.can_read_did(did, self.role)
         if not ok:
             return self._negative_response(
@@ -294,9 +340,9 @@ class ECUSimulator:
                 NRC_SECURITY_ACCESS_DENIED
             )
 
-        # ===============================
+        # -------------------------------
         # 5. VIN condition (speed = 0)
-        # ===============================
+        # -------------------------------
         if did == 0xF190:
             speed = self.db.get_did_value(0xF40D)
             if speed != 0:
@@ -305,9 +351,9 @@ class ECUSimulator:
                     NRC_CONDITIONS_NOT_CORRECT
                 )
 
-        # ===============================
+        # -------------------------------
         # 6. Encode value
-        # ===============================
+        # -------------------------------
         value_bytes = encode_value(did_info["value"], did_info["type"])
 
         response_payload = [
@@ -317,9 +363,9 @@ class ECUSimulator:
             *value_bytes
         ]
 
-        # ===============================
+        # -------------------------------
         # 7. Single Frame limit
-        # ===============================
+        # -------------------------------
         if len(response_payload) > 7:
             return self._negative_response(
                 SID_READ_DATA_BY_IDENTIFIER,

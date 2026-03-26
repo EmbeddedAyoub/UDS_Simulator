@@ -6,7 +6,7 @@
     "description": "Current vehicle speed",
     "readable": true,
     "writable": false,
-    "value": 50,
+    "value": 0,
     "unit": "km/h",
     "type": "uint8",
     "roles": ["admin", "technician", "reader"]
@@ -17,7 +17,7 @@
     "description": "Engine coolant temp in degrees Celsius",
     "readable": true,
     "writable": false,
-    "value": 90,
+    "value": 33,
     "unit": "°C",
     "type": "uint8",
     "roles": ["admin", "technician", "reader"]
@@ -85,6 +85,6 @@
     "value": "V2.1",
     "unit": "",
     "type": "string",
-    "roles": ["admin", "technician", "reader"]
+    "roles": ["admin", "technician"]
 }
 }
