@@ -1,37 +1,111 @@
-# UDS Simulator — Automotive Diagnostic Tool
+# UDS Simulator — ISO 14229
 
-A lightweight UDS (Unified Diagnostic Services) simulator built in Python to emulate communication between a diagnostic tester and an ECU — without requiring CAN hardware.
+> Pure software UDS diagnostic simulator built with Python & PyQt5.  
+> Simulates an ECU responding to diagnostic requests with real-time frame tracing.
 
-This project is designed for embedded systems, automotive diagnostics, and cybersecurity learning, with a focus on realistic behavior and strict protocol handling.
 ---
-# Features
 
-UDS protocol simulation (ISO 14229)
-ECU + Tester architecture
-PyQt5 graphical interface
-DID-based data system (JSON)
-Role-based access control (Admin / Technician / Reader)
-Real-time trace/log viewer
-Accurate Negative Response handling (NRC)
-Strict validation of request length and format
+## Installation
+
+```bash
+pip install PyQt5
+```
+
 ---
-# Supported Services
 
-Service	Name
-0x10	Diagnostic Session Control
-0x11	ECU Reset
-0x22	Read Data By Identifier
-0x27	Seccurity Accesses
+## Supported UDS Services
+
+| SID | Service | Description |
+|-----|---------|-------------|
+| `0x10` | DiagnosticSessionControl | Switch between Default / Extended / Programming |
+| `0x11` | ECUReset | Hard / Key Off / Soft reset |
+| `0x22` | ReadDataByIdentifier | Read DID value from ECU |
+| `0x27` | SecurityAccess | Seed/Key authentication (XOR 0xFF) |
+
 ---
-# How It Works
 
-The simulator mimics real ECU communication:
+## Diagnostic Sessions
 
-Tester (Client)  →  ECU Simulator  →  Response
-Communication is direct (no CAN hardware)
-Messages follow UDS Single Frame format (8 bytes)
-Payload is validated before processing
+| Session | Code | Condition |
+|---------|------|-----------|
+| Default | `0x01` | No condition |
+| Extended | `0x03` | Security must be unlocked |
+| Programming | `0x02` | Security unlocked + Engine Temp < 20°C |
+
 ---
-# Loging by this JSON data
 
-[text](DIDs/users.json)
+## NRC Codes
+
+| NRC | Name | Trigger |
+|-----|------|---------|
+| `0x10` | generalReject | Invalid SID (1 hex char) |
+| `0x11` | serviceNotSupported | SID not in valid list |
+| `0x12` | subFunctionNotSupported | Invalid sub-function |
+| `0x13` | incorrectMessageLength | Wrong byte count |
+| `0x14` | requestTooLong | Multiple DIDs in one request |
+| `0x22` | conditionsNotCorrect | VIN read while speed != 0 |
+| `0x24` | requestSequenceError | Key sent before seed |
+| `0x31` | requestOutOfRange | DID not in database |
+| `0x33` | securityAccessDenied | Security not unlocked |
+| `0x35` | invalidKey | Wrong key sent |
+| `0x7E` | subFunctionNotSupportedInActiveSession | Sub-function not allowed in session |
+| `0x7F` | serviceNotSupportedInActiveSession | Service not allowed in session |
+
+---
+
+## DID Database
+
+| DID | Name | Type | R | W | Roles |
+|-----|------|------|---|---|-------|
+| `0xF40D` | Vehicle Speed | uint8 | ✓ | ✗ | All |
+| `0xF405` | Engine Coolant Temp | uint8 | ✓ | ✗ | All |
+| `0xF406` | Engine RPM | uint16 | ✓ | ✗ | All |
+| `0xF190` | VIN | string | ✓ | ✓ | Admin |
+| `0xF18C` | ECU Serial Number | string | ✓ | ✗ | Admin, Tech |
+| `0xF186` | Active Session | uint8 | ✓ | ✗ | All |
+| `0xF187` | SW Version | string | ✓ | ✗ | All |
+| `0xF193` | HW Version | string | ✓ | ✗ | All |
+| `0x0101` | Odometer | uint32 | ✓ | ✗ | All |
+| `0x0102` | Fuel Level | uint8 | ✓ | ✗ | All |
+| `0x0200` | Max Speed Limit | uint8 | ✓ | ✓ | Admin, Tech |
+| `0x0201` | ECU Debug Mode | uint8 | ✓ | ✓ | Admin |
+
+---
+
+## User Roles
+
+| Role | Password | Read | Write | Session | Reset | Security |
+|------|----------|------|-------|---------|-------|----------|
+| `admin` | admin123 | ✓ | ✓ | ✓ | ✓ | ✓ |
+| `technician` | tech456 | ✓ | ✓ | ✓ | ✓ | ✗ |
+| `reader` | read789 | ✓ | ✗ | ✗ | ✗ | ✗ |
+
+---
+
+## Security Access Flow
+
+```
+1. Send seed request  →  0x2701
+2. ECU responds       →  67 01 12 34
+3. Calculate key      →  key = seed XOR 0xFF  →  ED CB
+4. Send key           →  0x270200EDCB
+5. ECU grants access  →  67 02
+```
+
+---
+
+## Command Input Examples
+
+| Command | Description |
+|---------|-------------|
+| `0x1001` | Default Session |
+| `0x1003` | Extended Session |
+| `0x1002` | Programming Session |
+| `0x1101` | Hard Reset |
+| `0x1103` | Soft Reset |
+| `0x22F40D` | Read Vehicle Speed |
+| `0x22F190` | Read VIN |
+| `0x2701` | Request Security Seed |
+| `0x270200EDCB` | Send Security Key |
+
+---
