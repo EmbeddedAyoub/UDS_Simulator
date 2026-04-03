@@ -30,7 +30,7 @@ pip install PyQt5
 |---------|------|-----------|
 | Default | `0x01` | No condition |
 | Extended | `0x03` | Security must be unlocked |
-| Programming | `0x02` | Security unlocked + Engine Temp < 20°C |
+| Programming | `0x02` | Security unlocked + Engine Stopped |
 
 ---
 
@@ -88,7 +88,7 @@ pip install PyQt5
 1. Send seed request  →  0x2701
 2. ECU responds       →  67 01 12 34
 3. Calculate key      →  key = seed XOR 0xFF  →  ED CB
-4. Send key           →  0x270200EDCB
+4. Send key           →  0x2702EDCB
 5. ECU grants access  →  67 02
 ```
 

@@ -4,11 +4,11 @@
 # =============================================================================
 
 from PyQt5.QtWidgets import (
-    QDialog, QVBoxLayout, QLabel,
+    QDialog, QHBoxLayout, QVBoxLayout, QLabel,
     QLineEdit, QPushButton, QFrame, QGraphicsDropShadowEffect
 )
 from PyQt5.QtCore import Qt, QPropertyAnimation, QEasingCurve, QPoint
-from PyQt5.QtGui  import QColor
+from PyQt5.QtGui  import QBrush, QColor, QPainter, QPixmap
 
 from common.db_handler    import DatabaseHandler
 
@@ -46,7 +46,7 @@ class LoginWindow(QDialog):
     # -------------------------------------------------------------------------
     def _setup_window(self):
         self.setWindowTitle("UDS Simulator — Login")
-        self.setFixedSize(520, 450)
+        self.setFixedSize(600, 600)
         self.setWindowFlags(Qt.Dialog | Qt.WindowCloseButtonHint)
         self.setAttribute(Qt.WA_TranslucentBackground, False)
 
@@ -74,6 +74,9 @@ class LoginWindow(QDialog):
         shadow.setColor(QColor(0, 0, 0, 40))
         shadow.setOffset(0, 4)
         self.card.setGraphicsEffect(shadow)
+
+        # -- Top bar
+        card_layout.addWidget(self._build_topbar())
 
         # -- Header
         card_layout.addLayout(self._build_header())
@@ -103,9 +106,56 @@ class LoginWindow(QDialog):
         card_layout.addStretch()
         main_layout.addWidget(self.card)
 
+ # -------------------------------------------------------------------------
+    # Top bar
+    # -------------------------------------------------------------------------
+    def _build_topbar(self) -> QFrame:
+        bar = QFrame()
+        bar.setObjectName("topbar")
+        bar.setFixedHeight(80)
+
+        layout = QHBoxLayout(bar)
+        layout.setContentsMargins(0, 0, 16, 0)
+        layout.setSpacing(20)
+
+        # Logo
+        lbl_logo = QLabel()
+        pixmap = QPixmap("logo/logo.jpg")
+        if not pixmap.isNull():
+            size = 60
+            rounded = QPixmap(size, size)
+            rounded.fill(Qt.transparent)
+            painter = QPainter(rounded)
+            painter.setRenderHint(QPainter.Antialiasing)
+            painter.setBrush(QBrush(pixmap.scaled(size, size, Qt.KeepAspectRatio, Qt.SmoothTransformation)))
+            painter.setPen(Qt.NoPen)
+            painter.drawEllipse(0, 0, size, size)
+            painter.end()
+            lbl_logo.setPixmap(rounded)
+        else:
+            lbl_logo.setText("⬡")
+            lbl_logo.setStyleSheet(f"font-size: 30px; color: {C['btn_active']};")
+        layout.addWidget(lbl_logo)
+
+        # Title
+        lbl_title = QLabel("SIGMA Embedded")
+        # set Sigma Embedded bigger and bolder than the header title
+        lbl_title.setStyleSheet(f"font-size: 24px; font-weight: bold; color: {COLORS['text_main']};")
+        lbl_title.setObjectName("topbar_title")
+        layout.addWidget(lbl_title)
+
+        layout.addStretch()
+        # seperate logo from next elements with some space
+        layout.addSpacing(20)
+
+        # layout.setSpacing(20)
+
+        return bar        
+
     def _build_header(self) -> QVBoxLayout:
         layout = QVBoxLayout()
-        layout.setSpacing(4)
+        layout.addSpacing(20)
+        layout.setSpacing(20)
 
         # Monospace title bhal image
         lbl_title = QLabel("UDS Simulator")

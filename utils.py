@@ -277,7 +277,7 @@ def build_uds_log_entry(
     from common.uds_constants import (
         UDS_FRAME_SIZE, UDS_PADDING_BYTE,
         POSITIVE_RESPONSE_OFFSET, NEGATIVE_RESPONSE_SID,
-        SESSION_NAMES, RESET_NAMES,
+        SESSION_NAMES, RESET_NAMES,SEC_NAMES,
         SID_DIAGNOSTIC_SESSION_CONTROL, SID_ECU_RESET,
         SID_READ_DATA_BY_IDENTIFIER, SID_SECURITY_ACCESS,
         NRC_NAMES,
@@ -352,6 +352,8 @@ def build_uds_log_entry(
                 service = SESSION_NAMES.get(sub, f"0x{sub:02X}").split(" (")[0]
             elif req_sid == SID_ECU_RESET:
                 service = RESET_NAMES.get(sub, f"0x{sub:02X}").split(" (")[0]
+            elif req_sid == SID_SECURITY_ACCESS:
+                service = SEC_NAMES.get(sub, f"0x{sub:02X}").split(" (")[0]
             elif req_sid == NEGATIVE_RESPONSE_SID and len(payload) >= 3:
                 service = NRC_NAMES.get(payload[2], f"NRC 0x{payload[2]:02X}")
             elif req_sid == SID_READ_DATA_BY_IDENTIFIER:

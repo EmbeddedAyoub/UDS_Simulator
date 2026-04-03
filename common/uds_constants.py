@@ -69,9 +69,15 @@ RESET_HARD      = 0x01  # Hard reset — bhal tqtl courant
 RESET_KEY_OFF   = 0x02  # Key off/on reset
 RESET_SOFT      = 0x03  # Soft reset — software reset bla HW
 
+# -----------------------------------------------------------------------------
+# 5. Security Access — Sub-function byte dial 0x27
+# -----------------------------------------------------------------------------
+
+REQUEST_SEED = 0x01  # Request Seed — awel step f security access
+SEND_KEY     = 0x02  # Send Key — tanya step f security access
 
 # -----------------------------------------------------------------------------
-# 5. Negative Response Codes (NRC) — ISO 14229-1 Table A.1
+# 6. Negative Response Codes (NRC) — ISO 14229-1 Table A.1
 # -----------------------------------------------------------------------------
 # Ila ECU mqdarch ykhdem request → yrj3 Negative Response.
 # Format: [0x7F, SID_li_fshel, NRC_code]
@@ -96,7 +102,7 @@ NEGATIVE_RESPONSE_SID = 0x7F  # Awel byte dial kol negative response
 
 
 # -----------------------------------------------------------------------------
-# 6. Read / Write Data — Sub-functions & helpers
+# 7. Read / Write Data — Sub-functions & helpers
 # -----------------------------------------------------------------------------
 # SID 0x22 (ReadDataByIdentifier) w 0x2E (WriteDataByIdentifier)
 # ma3ndhomch sub-function byte bhal DSC —
@@ -124,7 +130,7 @@ DID_ACTIVE_SESSION      = 0xF186  # Active Diagnostic Session (read-only)
 
 
 # -----------------------------------------------------------------------------
-# 7. User Roles (RBAC — Role Based Access Control)
+# 8. User Roles (RBAC — Role Based Access Control)
 # -----------------------------------------------------------------------------
 # Kol user 3ndu role — role kayhdrd shi services yqdr ykhdem.
 # Ex: READER yqdr ghir yqra DIDs — mashi yktb
@@ -136,7 +142,7 @@ ROLE_READER     = "reader"      # Ghir read DIDs — mashi write mashi reset
 
 
 # -----------------------------------------------------------------------------
-# 8. Session Access Matrix
+# 9. Session Access Matrix
 # -----------------------------------------------------------------------------
 # Dict li kayhdrd ayy service msmoh f ayy session + ayy role
 # -----------------------------------------------------------------------------
@@ -146,6 +152,7 @@ SESSION_SERVICE_MATRIX = {
         "allowed_services": [
             SID_DIAGNOSTIC_SESSION_CONTROL,
             SID_SECURITY_ACCESS,
+            SID_READ_DATA_BY_IDENTIFIER,
             SID_ECU_RESET,
         ],
         "description": "Default Session — services de base Sghir"
@@ -172,7 +179,7 @@ SESSION_SERVICE_MATRIX = {
 
 
 # -----------------------------------------------------------------------------
-# 9. Role Service Permissions
+# 10. Role Service Permissions
 # -----------------------------------------------------------------------------
 # Men b3d session check, kayjay role check.
 # Admin yqdr kol shi, technician htta write, reader ghir read.
@@ -201,7 +208,7 @@ ROLE_PERMISSIONS = {
 
 
 # -----------------------------------------------------------------------------
-# 10. Human-readable name maps — pour affichage f GUI
+# 11. Human-readable name maps — pour affichage f GUI
 # -----------------------------------------------------------------------------
 
 SESSION_NAMES = {
@@ -214,6 +221,11 @@ RESET_NAMES = {
     RESET_HARD:    "Hard Reset (0x01)",
     RESET_KEY_OFF: "Key Off/On Reset (0x02)",
     RESET_SOFT:    "Soft Reset (0x03)",
+}
+
+SEC_NAMES = {
+    REQUEST_SEED:    "Request Seed (0x01)",
+    SEND_KEY: "Send Key (0x02)",
 }
 
 NRC_NAMES = {

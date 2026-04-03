@@ -24,6 +24,8 @@ from common.uds_constants import (
     SESSION_NAMES,
     # Resets
     RESET_HARD, RESET_NAMES,
+    # Security Access
+    SEC_NAMES,
     # NRC
     NRC_NAMES,
 )

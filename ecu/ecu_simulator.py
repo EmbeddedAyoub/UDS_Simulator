@@ -43,6 +43,7 @@ from common.uds_constants import (
     NRC_EXCEEDED_NUMBER_OF_ATTEMPTS,
     # DID constants
     DID_ACTIVE_SESSION,
+    DID_VEHICLE_SPEED,
 )
 from common.db_handler import DatabaseHandler
 from utils import (
@@ -70,6 +71,7 @@ class ECUSimulator:
         self._failed_key_attempts = 0
         self._max_key_attempts    = 3
         self._key_off_allowed = False
+        self.engine_running = bool(self.db.get_did_value(DID_VEHICLE_SPEED))
         # Callback — GUI tconnectiw bih bach tchargi log entries
         # tstawdih hakda: ecu.on_frame_logged = my_gui_function
         self.on_frame_logged = None
@@ -177,10 +179,7 @@ class ECUSimulator:
         # 4. CONDITIONS (Programming only)
         # ===============================
         if sub_function == SESSION_PROGRAMMING:
-            TEMP_DID = 0xF405
-            temp = self.db.get_did_value(TEMP_DID)
-
-            if temp is not None and temp >= 20 :
+            if self.is_engine_running():
                 return self._negative_response(
                     SID_DIAGNOSTIC_SESSION_CONTROL,
                     NRC_CONDITIONS_NOT_CORRECT
@@ -237,22 +236,15 @@ class ECUSimulator:
         reset_type = payload[1]
 
         # Reset type valid?
-        if reset_type not in [RESET_KEY_OFF, RESET_SOFT]:
+        if reset_type not in [RESET_SOFT, RESET_HARD]:
             return self._negative_response(SID_ECU_RESET,
                                            NRC_SUBFUNCTION_NOT_SUPPORTED)
-        if reset_type == RESET_KEY_OFF:
-            if not self._key_off_allowed:
+        if reset_type in [RESET_KEY_OFF, RESET_HARD]:
+            if not getattr(self, '_security_unlocked', False):
                 return self._negative_response(
                     SID_ECU_RESET,
-                    NRC_CONDITIONS_NOT_CORRECT
-                )
-        if reset_type == RESET_SOFT:
-            if self.current_session == SESSION_DEFAULT:
-                if not getattr(self, '_security_unlocked', False):
-                    return self._negative_response(
-                        SID_ECU_RESET,
-                        NRC_SECURITY_ACCESS_DENIED
-                )
+                    NRC_SECURITY_ACCESS_DENIED
+            )
         # Role check
         ok, reason = self.db.can_reset_ecu(self.role)
         if not ok:
@@ -263,10 +255,11 @@ class ECUSimulator:
         self.current_session = SESSION_DEFAULT
         self.db.set_did_value(DID_ACTIVE_SESSION, SESSION_DEFAULT)
 
-        if reset_type == RESET_HARD:
-            self._failed_key_attempts = 0
-            self._security_unlocked   = False  # ← lock again
-            self._seed                = None   # ← clear seed
+        
+        self._failed_key_attempts = 0
+        self._security_unlocked   = False  # ← lock again
+        self._seed                = None   # ← clear seed
+
         response_payload = [
             SID_ECU_RESET + POSITIVE_RESPONSE_OFFSET,
             reset_type
@@ -485,6 +478,40 @@ class ECUSimulator:
     def get_session_name(self) -> str:
         """Yrd current session name — pour affichage f GUI."""
         return SESSION_NAMES.get(self.current_session, "Unknown Session")
+
+    def is_engine_running(self) -> bool:
+        """Yrd wach engine khdama awla stopped."""
+        return self.engine_running
+
+    def is_security_unlocked(self) -> bool:
+        """Yrd wach security access unlocked awla locked."""
+        return getattr(self, '_security_unlocked', False)
+
+    def start_engine(self) -> bool:
+        """Start engine by updating vehicle speed and RPM state."""
+        if self.engine_running:
+            return False
+        self.engine_running = True
+        self.db.set_did_value(DID_VEHICLE_SPEED, 20)
+        self.db.set_did_value(0xF406, 1500)
+        return True
+
+    def stop_engine(self) -> bool:
+        """Stop engine by setting vehicle speed and RPM to zero."""
+        if not self.engine_running:
+            return False
+        self.engine_running = False
+        self.db.set_did_value(DID_VEHICLE_SPEED, 0)
+        self.db.set_did_value(0xF406, 0)
+        return True
+
+    def toggle_engine(self) -> bool:
+        """Toggle engine status and return new running state."""
+        if self.engine_running:
+            self.stop_engine()
+        else:
+            self.start_engine()
+        return self.engine_running
 
     def set_role(self, role: str):
         """Ybddel role — waqtash user ybddel account."""

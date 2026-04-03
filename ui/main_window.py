@@ -148,6 +148,25 @@ class MainWindow(QMainWindow):
         self.lbl_session.setObjectName("lbl_session")
         layout.addWidget(self.lbl_session)
 
+        layout.addSpacing(12)
+
+        # Engine indicator
+        # add engine logo next to the engine status text
+        self.lbl_engine = QLabel("● Engine Stopped")
+        self.lbl_engine.setObjectName("lbl_engine")
+        self.lbl_engine.setStyleSheet(
+            f"color: {C['error']}; font-family: 'JetBrains Mono'; font-size: 14px; font-weight: bold;"
+        )
+        layout.addWidget(self.lbl_engine)
+        layout.addSpacing(12)
+
+        # Security indicator
+        self.lbl_security = QLabel("🔒 Locked")
+        self.lbl_security.setObjectName("lbl_security")
+        self.lbl_security.setStyleSheet(
+            f"color: {C['error']}; font-family: 'JetBrains Mono'; font-size: 14px; font-weight: bold;"
+        )
+        layout.addWidget(self.lbl_security)
         layout.addSpacing(16)
 
         # Role badge
@@ -205,6 +224,14 @@ class MainWindow(QMainWindow):
         btn_clear.setCursor(Qt.PointingHandCursor)
         btn_clear.clicked.connect(self._clear_log)
         input_row.addWidget(btn_clear)
+
+        self.btn_engine = QPushButton("Start Engine")
+        self.btn_engine.setObjectName("btn_engine")
+        self.btn_engine.setFixedHeight(40)
+        self.btn_engine.setFixedWidth(130)
+        self.btn_engine.setCursor(Qt.PointingHandCursor)
+        self.btn_engine.clicked.connect(self._toggle_engine)
+        input_row.addWidget(self.btn_engine)
 
         layout.addLayout(input_row)
 
@@ -364,6 +391,10 @@ class MainWindow(QMainWindow):
         except ValueError:
             return
 
+        # if sub == SESSION_PROGRAMMING and self.ecu.is_engine_running():
+        #     self._set_status("Programming session blocked while engine is running.")
+        #     return
+
         result = self.client.change_session(sub)
         if result["success"]:
             self._update_session_indicator()
@@ -381,6 +412,7 @@ class MainWindow(QMainWindow):
         result = self.client.reset_ecu(reset_type)
         if result["success"]:
             self._update_session_indicator()
+            self._update_security_indicator()
 
     def _parse_read(self, raw: str):
         did_part = raw[2:]  # remove SID byte (22)
@@ -428,6 +460,7 @@ class MainWindow(QMainWindow):
                     return
                 payload.append(int(chunk, 16))
             self.client.send_raw(payload)
+            self._update_security_indicator()
         except ValueError:
             self.client.send_raw([0x27, sub])
     # =========================================================================
@@ -511,6 +544,50 @@ class MainWindow(QMainWindow):
         self.lbl_session.setStyleSheet(
             f"color: {color}; font-family: 'JetBrains Mono'; font-size: 16px; font-weight: bold;"
         )
+        self._update_engine_indicator()
+
+    def _update_engine_indicator(self):
+        if self.ecu.is_engine_running():
+            text = "Engine Running"
+            color = C["accent"]
+            engine_button_text = "Stop Engine"
+        else:
+            text = "Engine Stopped"
+            color = C["error"]
+            engine_button_text = "Start Engine"
+
+        self.lbl_engine.setText(text)
+        self.lbl_engine.setStyleSheet(
+            f"color: {color}; font-family: 'JetBrains Mono'; font-size: 14px; font-weight: bold;"
+        )
+
+        if hasattr(self, 'btn_engine'):
+            self.btn_engine.setText(engine_button_text)
+
+        self._update_security_indicator()
+
+    def _update_security_indicator(self):
+        if self.ecu.is_security_unlocked():
+            text = "🔓 Unlocked"
+            color = C["accent"]
+        else:
+            text = "🔒 Locked"
+            color = C["error"]
+
+        self.lbl_security.setText(text)
+        self.lbl_security.setStyleSheet(
+            f"color: {color}; font-family: 'JetBrains Mono'; font-size: 14px; font-weight: bold;"
+        )
+
+    def _set_status(self, message: str):
+        self.lbl_status.setText(message)
+
+    def _toggle_engine(self):
+        if self.ecu.toggle_engine():
+            self._set_status("Engine started.")
+        else:
+            self._set_status("Engine stopped.")
+        self._update_engine_indicator()
 
     # =========================================================================
     # STYLES
@@ -578,6 +655,23 @@ class MainWindow(QMainWindow):
             QPushButton#btn_clear:hover {{
                 border-color: {C["error"]};
                 color: {C["error"]};
+            }}
+            QPushButton#btn_engine {{
+                background-color: {C["btn_active"]};
+                color: white;
+                border: none;
+                border-radius: 4px;
+                font-family: 'JetBrains Mono';
+                font-size: 12px;
+                font-weight: bold;
+            }}
+            QPushButton#btn_engine:hover {{
+                background-color: {C["border_focus"]};
+            }}
+            QLabel#lbl_security {{
+                font-family: 'JetBrains Mono';
+                font-size: 14px;
+                font-weight: bold;
             }}
 
 
